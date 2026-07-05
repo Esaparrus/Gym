@@ -12,6 +12,7 @@ type RestState = {
   exerciseName: string;
   secondsLeft: number;
   totalSeconds: number;
+  endsAt: number;
 };
 
 type SessionHistoryEntry = {
@@ -112,8 +113,9 @@ function formatDate(isoString: string) {
 }
 
 function formatTimer(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
@@ -222,7 +224,9 @@ export default function App() {
           return null;
         }
 
-        if (current.secondsLeft <= 1) {
+        const nextSecondsLeft = Math.max(0, Math.ceil((current.endsAt - Date.now()) / 1000));
+
+        if (nextSecondsLeft <= 0) {
           window.clearInterval(timer);
           window.navigator.vibrate?.([200, 120, 240]);
           if (document.visibilityState !== "visible" && "Notification" in window && Notification.permission === "granted") {
@@ -235,7 +239,7 @@ export default function App() {
 
         return {
           ...current,
-          secondsLeft: current.secondsLeft - 1
+          secondsLeft: nextSecondsLeft
         };
       });
     }, 1000);
@@ -372,10 +376,12 @@ export default function App() {
     }));
 
     const restSeconds = exercise.restSeconds ?? 60;
+    const endsAt = Date.now() + restSeconds * 1000;
     setRestState({
       exerciseName: exercise.name,
       secondsLeft: restSeconds,
-      totalSeconds: restSeconds
+      totalSeconds: restSeconds,
+      endsAt
     });
     setSelectedExerciseKey(key);
     setActiveTab("train");
