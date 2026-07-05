@@ -435,33 +435,19 @@ export default function App() {
 
   const currentExerciseInfo = currentExercise ? getExerciseInfo(currentExercise) : null;
   const restProgress = restState ? Math.round(((restState.totalSeconds - restState.secondsLeft) / restState.totalSeconds) * 100) : 0;
+  const remainingSets = completion.totalSets - completion.completedSets;
 
   return (
     <main className="app-shell">
-      <section className="hero">
+      <section className="session-bar">
         <div>
-          <p className="eyebrow">Gym Sesiones</p>
-          <h1>Rutinas gratis, claras y hechas para el movil.</h1>
-          <p className="hero-copy">
-            Sin API de pago: tu le pides la rutina a ChatGPT, pegas el JSON aqui y entrenas con botones grandes,
-            descanso automatico e historial de pesos.
-          </p>
+          <p className="eyebrow">{workout.focus ?? "Entreno"}</p>
+          <h1>{workout.title}</h1>
         </div>
-
-        <div className="hero-stats">
-          <div className="stat-card">
-            <span>Progreso</span>
-            <strong>{completion.percent}%</strong>
-            <small>
-              {completion.completedSets} / {completion.totalSets} series
-            </small>
-          </div>
-
-          <div className={`stat-card rest-card ${restState ? "active" : ""}`}>
-            <span>Descanso</span>
-            <strong>{restState ? formatTimer(restState.secondsLeft) : "Listo"}</strong>
-            <small>{restState ? `Vuelves a ${restState.exerciseName}` : "Sin temporizador activo"}</small>
-          </div>
+        <div className="session-stats">
+          <span>{completion.completedSets}/{completion.totalSets} series</span>
+          <span>{remainingSets} pendientes</span>
+          <span>{restState ? `Descanso ${formatTimer(restState.secondsLeft)}` : "Sin descanso"}</span>
         </div>
       </section>
 
@@ -481,15 +467,12 @@ export default function App() {
         <section className={`panel panel-focus ${activeTab === "train" ? "tab-visible" : "tab-hidden"}`}>
           {currentExercise ? (
             <>
-              <div className="panel-header">
+              <div className="panel-header panel-header-tight">
                 <div>
                   <p className="eyebrow">Ahora toca</p>
                   <h2>{currentExercise.name}</h2>
                   <p>{currentExerciseInfo?.muscleGroup ?? workout.focus ?? "Rutina del dia"}</p>
                 </div>
-                <button className="ghost-button" onClick={saveSessionToHistory}>
-                  Guardar entreno
-                </button>
               </div>
 
               <div className="focus-card">
@@ -539,8 +522,65 @@ export default function App() {
                 {currentExercise.notes ? <p className="exercise-notes">{currentExercise.notes}</p> : null}
               </div>
 
+              <div className="train-actions-bar">
+                <button className="ghost-button" onClick={saveSessionToHistory}>
+                  Guardar entreno
+                </button>
+                <button className="ghost-button" onClick={resetSession}>
+                  Reiniciar
+                </button>
+                <button className="ghost-button" onClick={() => setActiveTab("routine")}>
+                  Cambiar rutina
+                </button>
+              </div>
+
+              <section className="panel-inline">
+                <div className="section-head">
+                  <h3>Ejercicios de hoy</h3>
+                  <span>{completion.percent}%</span>
+                </div>
+
+                <div className="exercise-list compact-list">
+                  {workout.exercises.map((exercise, index) => {
+                    const key = getExerciseKey(exercise, index);
+                    const itemProgress = progress[key] ?? { completedSets: 0 };
+                    const isCurrent = key === currentExerciseKey;
+                    const isDone = itemProgress.completedSets >= exercise.sets;
+
+                    return (
+                      <article key={key} className={`exercise-card compact ${isDone ? "done" : ""} ${isCurrent ? "current" : ""}`}>
+                        <button
+                          className="exercise-select"
+                          onClick={() => {
+                            setSelectedExerciseKey(key);
+                            setActiveTab("train");
+                          }}
+                        >
+                          <div>
+                            <p className="exercise-meta">{getExerciseInfo(exercise).muscleGroup ?? "Ejercicio"}</p>
+                            <h3>{exercise.name}</h3>
+                            <p className="exercise-prescription">
+                              {itemProgress.completedSets}/{exercise.sets} series
+                              {getSavedWeight(savedWeights, exercise) ? ` | ${getSavedWeight(savedWeights, exercise)}` : ""}
+                            </p>
+                          </div>
+                          <span className="exercise-jump">{isCurrent ? "Ahora" : "Abrir"}</span>
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+
               <div className="detail-card quick-guide">
-                <h3>Como hacerlo</h3>
+                <div className="section-head">
+                  <h3>Como hacerlo</h3>
+                  {currentExerciseInfo?.videoUrl ? (
+                    <a className="video-link compact-link" href={currentExerciseInfo.videoUrl} target="_blank" rel="noreferrer">
+                      Ver tecnica
+                    </a>
+                  ) : null}
+                </div>
                 {currentExerciseInfo?.instructions.length ? (
                   <ul>
                     {currentExerciseInfo.instructions.map((step) => (
@@ -550,11 +590,6 @@ export default function App() {
                 ) : (
                   <p>Este ejercicio no tiene guia aun. Puedes anadirla dentro del JSON.</p>
                 )}
-                {currentExerciseInfo?.videoUrl ? (
-                  <a className="video-link" href={currentExerciseInfo.videoUrl} target="_blank" rel="noreferrer">
-                    Abrir referencia tecnica
-                  </a>
-                ) : null}
               </div>
             </>
           ) : null}
@@ -613,9 +648,6 @@ export default function App() {
               <h2>{workout.title}</h2>
               <p>{workout.notes ?? "Sin notas generales."}</p>
             </div>
-            <button className="ghost-button" onClick={resetSession}>
-              Reiniciar
-            </button>
           </div>
 
           <div className="exercise-list">
