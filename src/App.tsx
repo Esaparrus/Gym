@@ -146,6 +146,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("train");
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [isPastingWorkout, setIsPastingWorkout] = useState(false);
 
   useEffect(() => {
     const savedDraft = window.localStorage.getItem(DRAFT_KEY);
@@ -266,19 +267,24 @@ export default function App() {
     }
   }
 
-  function loadWorkoutFromDraft() {
+  function applyWorkout(rawWorkout: string) {
     try {
-      const parsed = parseWorkout(draft);
+      const parsed = parseWorkout(rawWorkout);
       setWorkout(parsed);
       setProgress(buildInitialProgress(parsed));
       setRestState(null);
       setSelectedExerciseKey(getExerciseKey(parsed.exercises[0], 0));
+      setDraft(extractJsonPayload(rawWorkout));
       setActiveTab("train");
       setError("");
       requestNotifications();
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "No se ha podido leer el JSON.");
     }
+  }
+
+  function loadWorkoutFromDraft() {
+    applyWorkout(draft);
   }
 
   function resetSession() {
@@ -318,6 +324,29 @@ export default function App() {
 
     const nextValue = `${draft.slice(0, start)}${normalizedPaste}${draft.slice(end)}`;
     setDraft(nextValue);
+  }
+
+  async function pasteWorkoutFromClipboard() {
+    if (!navigator.clipboard?.readText) {
+      setError("Tu navegador no permite leer el portapapeles directamente. Pega el texto manualmente.");
+      return;
+    }
+
+    setIsPastingWorkout(true);
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText.trim()) {
+        setError("El portapapeles esta vacio.");
+        return;
+      }
+
+      applyWorkout(clipboardText);
+    } catch {
+      setError("No he podido leer el portapapeles. Revisa permisos del navegador o pega el texto manualmente.");
+    } finally {
+      setIsPastingWorkout(false);
+    }
   }
 
   function updateExerciseWeight(exercise: WorkoutExercise, nextWeight: string) {
@@ -555,6 +584,12 @@ export default function App() {
               Importar JSON
               <input type="file" accept=".json,application/json" onChange={handleFileImport} />
             </label>
+            <button className="ghost-button" onClick={() => void pasteWorkoutFromClipboard()}>
+              {isPastingWorkout ? "Pegando..." : "Pegar desde ChatGPT"}
+            </button>
+          </div>
+
+          <div className="editor-actions editor-actions-secondary">
             <button className="primary-button" onClick={loadWorkoutFromDraft}>
               Usar esta rutina
             </button>

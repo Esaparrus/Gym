@@ -264,6 +264,10 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.editor-actions-secondary {
+  grid-template-columns: 1fr;
+}
+
 .primary-button,
 .ghost-button,
 .file-button,
