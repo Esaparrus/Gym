@@ -5,7 +5,19 @@ import "./styles.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js");
+    void navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        void registration.unregister();
+      });
+    });
+
+    if ("caches" in window) {
+      void caches.keys().then((cacheKeys) => {
+        cacheKeys.forEach((cacheKey) => {
+          void caches.delete(cacheKey);
+        });
+      });
+    }
   });
 }
 
