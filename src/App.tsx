@@ -61,8 +61,35 @@ function getExerciseInfo(exercise: WorkoutExercise) {
   };
 }
 
+function extractJsonPayload(raw: string) {
+  const cleaned = raw
+    .trim()
+    .replace(/^\uFEFF/, "")
+    .replace(/[\u200B-\u200D\u2060]/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/```json\s*/gi, "")
+    .replace(/```/g, "")
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'");
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error("No he encontrado un bloque JSON valido. Pega solo el contenido que empieza por { y termina por }.");
+  }
+
+  return cleaned.slice(firstBrace, lastBrace + 1);
+}
+
 function parseWorkout(raw: string): WorkoutPlan {
-  const parsed = JSON.parse(raw) as WorkoutPlan;
+  let parsed: WorkoutPlan;
+
+  try {
+    parsed = JSON.parse(extractJsonPayload(raw)) as WorkoutPlan;
+  } catch {
+    throw new Error("No se ha podido leer el JSON. Si vienes de movil, copia solo el bloque JSON sin texto extra.");
+  }
 
   if (!parsed.title || !Array.isArray(parsed.exercises) || parsed.exercises.length === 0) {
     throw new Error("El JSON necesita un titulo y una lista de ejercicios.");
@@ -272,6 +299,25 @@ export default function App() {
       setActiveTab("routine");
     };
     reader.readAsText(file);
+  }
+
+  function handleDraftPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedText = event.clipboardData.getData("text");
+    if (!pastedText) {
+      return;
+    }
+
+    event.preventDefault();
+    const start = event.currentTarget.selectionStart;
+    const end = event.currentTarget.selectionEnd;
+    const normalizedPaste = pastedText
+      .replace(/^\uFEFF/, "")
+      .replace(/[\u200B-\u200D\u2060]/g, "")
+      .replace(/[“”]/g, "\"")
+      .replace(/[‘’]/g, "'");
+
+    const nextValue = `${draft.slice(0, start)}${normalizedPaste}${draft.slice(end)}`;
+    setDraft(nextValue);
   }
 
   function updateExerciseWeight(exercise: WorkoutExercise, nextWeight: string) {
@@ -499,6 +545,7 @@ export default function App() {
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onPaste={handleDraftPaste}
             spellCheck={false}
             className="json-input"
           />
